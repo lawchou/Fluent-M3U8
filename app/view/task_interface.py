@@ -2,7 +2,7 @@
 from typing import Dict, List
 from PySide6.QtCore import Qt, Signal, Property, QSize
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QGraphicsDropShadowEffect
+from PySide6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout, QGraphicsDropShadowEffect, QHBoxLayout
 
 from qfluentwidgets import (Action, FluentIcon, SegmentedWidget, InfoBar, InfoBarPosition,
                             PushButton, Flyout, CommandBarView, isDarkTheme)
@@ -19,6 +19,7 @@ from ..components.task_card import (VODDownloadingTaskCard, Task, SuccessTaskCar
                                     LiveDownloadingTaskCard, DeleteTaskDialog)
 from ..components.empty_status_widget import EmptyStatusWidget
 from ..common.speed_badge import SpeedBadge
+from ..components.add_download_dialog import AddDownloadDialog
 
 
 class TaskInterface(Interface):
@@ -35,6 +36,11 @@ class TaskInterface(Interface):
         self.failedTaskView = FailedTaskView(self)
         self.emptyStatusWidget = EmptyStatusWidget(Logo.SMILEFACE, self.tr("Currently no download tasks"), self)
         self.speedBadge = SpeedBadge(self)
+
+        # button to open AddDownloadDialog
+        self.addDownloadButton = PushButton(self.tr("新增下载任务"), self)
+        self.addDownloadButton.setToolTip(self.tr("Add a new download task"))
+        self.addDownloadButton.clicked.connect(self._onAddDownloadButtonClicked)
 
         self._initWidgets()
 
@@ -55,8 +61,18 @@ class TaskInterface(Interface):
         self._connectSignalToSlot()
 
     def _initLayout(self):
-        self.vBoxLayout.addWidget(self.pivot, 0, Qt.AlignmentFlag.AlignLeft)
+        # place pivot and add button on same row
+        topHBox = QHBoxLayout()
+        topHBox.addWidget(self.pivot, 0, Qt.AlignmentFlag.AlignLeft)
+        topHBox.addStretch(1)
+        topHBox.addWidget(self.addDownloadButton, 0, Qt.AlignmentFlag.AlignRight)
+
+        self.vBoxLayout.addLayout(topHBox)
         self.viewLayout.addWidget(self.stackedWidget)
+
+    def _onAddDownloadButtonClicked(self):
+        dialog = AddDownloadDialog(self.window())
+        dialog.exec()
 
     def _onTaskCreated(self, task: Task):
         self.downloadingTaskView.addTask(task)
