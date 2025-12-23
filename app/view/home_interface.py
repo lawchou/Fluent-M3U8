@@ -8,7 +8,8 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout
 from qfluentwidgets import ScrollArea, InfoBar, InfoBarPosition, PushButton
 
 from ..components.info_card import M3U8DLInfoCard
-from ..components.config_card import BasicConfigCard, AdvanceConfigCard, ProxyConfigCard, LiveConfigCard, DecryptionConfigCard, MuxConfigCard
+from ..components.config_card import AdvanceConfigCard, ProxyConfigCard, LiveConfigCard, DecryptionConfigCard, MuxConfigCard
+from ..components.add_download_dialog import AddDownloadDialog
 
 from ..service.m3u8dl_service import m3u8Service
 from ..common.config import cfg
@@ -25,7 +26,6 @@ class HomeInterface(ScrollArea):
         self.installProgressInfoBar = None
 
         self.m3u8dlInfoCard = M3U8DLInfoCard()
-        self.basicSettingCard = BasicConfigCard()
         self.muxSettingCard = MuxConfigCard()
         self.advanceSettingCard = AdvanceConfigCard()
         self.proxySettingCard = ProxyConfigCard()
@@ -47,8 +47,7 @@ class HomeInterface(ScrollArea):
         self.vBoxLayout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.vBoxLayout.addWidget(
             self.m3u8dlInfoCard, 0, Qt.AlignmentFlag.AlignTop)
-        self.vBoxLayout.addWidget(
-            self.basicSettingCard, 0, Qt.AlignmentFlag.AlignTop)
+        # basic setting removed from home interface; use task page dialog instead
         self.vBoxLayout.addWidget(
             self.liveSettingCard, 0, Qt.AlignmentFlag.AlignTop)
         self.vBoxLayout.addWidget(
@@ -66,69 +65,6 @@ class HomeInterface(ScrollArea):
 
         self._connectSignalToSlot()
 
-    def _onDownloadButtonClicked(self):
-        if not m3u8Service.isAvailable():
-            InfoBar.error(
-                self.tr("Task failed"),
-                self.tr("Please choose N_m3u8DL-RE binary file in setting interface"),
-                duration=-1,
-                position=InfoBarPosition.BOTTOM,
-                parent=self
-            )
-            return
-
-        basicOptions = self.basicSettingCard.parseOptions()
-        if not basicOptions:
-            InfoBar.warning(
-                self.tr("Task failed"),
-                self.tr("No available tasks found, please check the format of txt"),
-                duration=-1,
-                position=InfoBarPosition.BOTTOM,
-                parent=self
-            )
-            return
-
-        success = True
-
-        for basicOption in basicOptions:
-            options = [
-                *basicOption,
-                *self.proxySettingCard.parseOptions(),
-                *self.advanceSettingCard.parseOptions(),
-                *self.liveSettingCard.parseOptions(),
-                *self.muxSettingCard.parseOptions(),
-                *self.decryptionCard.parseOptions(),
-            ]
-            success = m3u8Service.download(options, self.basicSettingCard.mediaParser) and success
-
-        button = PushButton(self.tr('Check'))
-
-        if success:
-            w = InfoBar.success(
-                self.tr("Task created"),
-                self.tr("Please check the download task"),
-                duration=5000,
-                position=InfoBarPosition.BOTTOM,
-                parent=self
-            )
-            button.clicked.connect(signalBus.switchToTaskInterfaceSig)
-
-            if cfg.get(cfg.autoResetLink):
-                self.basicSettingCard.urlLineEdit.clear()
-                self.basicSettingCard.fileNameLineEdit.clear()
-        else:
-            w = InfoBar.error(
-                self.tr("Task failed"),
-                self.tr("Please check the error log"),
-                duration=-1,
-                position=InfoBarPosition.BOTTOM,
-                parent=self
-            )
-            button.clicked.connect(m3u8Service.showDownloadLog)
-
-        w.widgetLayout.insertSpacing(0, 10)
-        w.addWidget(button)
-
     def dragEnterEvent(self, e):
         if not e.mimeData().hasUrls():
             return e.ignore()
@@ -142,11 +78,16 @@ class HomeInterface(ScrollArea):
         fileInfo = QFileInfo(e.mimeData().urls()[0].toLocalFile())
         path = fileInfo.absoluteFilePath()
 
-        if fileInfo.isFile() and path.lower().endswith(".txt"):
-            self.setDownloadLink(path)
-
-    def setDownloadLink(self, url: str):
-        self.basicSettingCard.urlLineEdit.setText(url)
+        if fileInfo.isFile() and path.lower().endswith('.txt'):
+            # open AddDownloadDialog on home when user drops a txt file
+            try:
+                dialog = AddDownloadDialog(self.window())
+                dialog.setDownloadLink(path)
+                dialog.exec()
+            except Exception:
+                # fallback: try to set as text to any existing handler
+                pass
 
     def _connectSignalToSlot(self):
-        self.basicSettingCard.downloadButton.clicked.connect(self._onDownloadButtonClicked)
+        # Home no longer has download button; nothing to connect here
+        pass
